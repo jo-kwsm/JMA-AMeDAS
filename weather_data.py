@@ -33,6 +33,8 @@ city_name_path = '//*[@id="selectedStationList"]/div/div[1]'
 prefectures = ['//*[@id="pr44"]']
 #取得要素のリスト
 #テスト時は項目を絞る
+#TODO　本番環境は全項目のダウンロード
+#TODO　カラム名の指定の仕方
 elements = ["気温", "降水量", "日照時間", "風向・風速"]
 columns = {
     "気温":["temperature","temperature:quality","temperature:homogeneity"],
@@ -40,7 +42,6 @@ columns = {
     "日照時間":["daylight","daylight:quality","daylight:homogeneity"],
     "風向・風速":["wind_velocity","wind_velocity:quality","wind_direction","wind_direction:quality","wind:homogeneity"],
 }
-#TODO　本番環境は全項目のダウンロード
 #elements = ["気温", "降水量","降雪の深さ","積雪の深さ","日照時間","風向・風速","全天日射量","現地気圧","海面気圧","相対湿度","蒸気圧","露点温度","天気","雲量","視程"]
 
 #ブラウザ閲覧時のオプションを指定するオブジェクト"options"を作成
@@ -84,10 +85,12 @@ for prefecture in prefectures:
             for id in range(1,to,2):
                 cities.append('//*[@id="stationMap"]/div['+str(id)+']')
             break
-    #x_pathから地区名を取得
+    
+    error_cities = []
 
     for city in tqdm(cities):
         #地区選択
+        #TODO　都道府県を選択した場合continue
         driver.find_elements_by_xpath(city)[0].click()
         city_name = driver.find_element_by_xpath(city_name_path).text
         error_flag = False
@@ -96,8 +99,6 @@ for prefecture in prefectures:
         #時別に変更
         driver.find_elements_by_xpath(hour_button)[0].click()
         data = []
-        
-        
         for i in range(year_range):
             if error_flag:
                 break
@@ -132,7 +133,7 @@ for prefecture in prefectures:
                 try:
                     tmp_data.columns=columns[element]
                 except:
-                    print(city_name)
+                    error_cities.append(city_name)
                     error_flag = True
                 data_list.append(tmp_data)
                 #消去
@@ -152,5 +153,7 @@ for prefecture in prefectures:
         driver.find_elements_by_xpath(area_button)[0].click()
         #地区選択解除
         driver.find_elements_by_xpath(city)[0].click()
+    #保存できなかった地域を出力
+    print(','.join(error_cities))
     #ドライバーを閉じる
     driver.quit()
