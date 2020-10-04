@@ -106,7 +106,7 @@ def main():
             #    continue
             #地区選択
             driver.find_elements_by_xpath(city)[0].click()
-            city_name = driver.find_element_by_xpath#(city_name_path).title
+            city_name = driver.find_element_by_xpath(city_name_path).text
             error_flag = False
             #要素選択画面に変更
             driver.find_elements_by_xpath(element_button)[0].click()
