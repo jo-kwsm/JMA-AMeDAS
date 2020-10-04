@@ -76,23 +76,24 @@ for prefecture in prefectures:
     driver.find_elements_by_xpath(prefecture)[0].click()
     time.sleep(0.5)
     #地区のx_pathを取得
-    cities = []
+    cities = {}
     for to in range(1,1000,2):
         path = '//*[@id="stationMap"]/div['+str(to)+']'
         try:
             driver.find_element_by_xpath(path)
         except:
             for id in range(1,to,2):
-                cities.append('//*[@id="stationMap"]/div['+str(id)+']')
+                path = '//*[@id="stationMap"]/div['+str(id)+']'
+                name = driver.find_element_by_xpath(path).text
+                cities[name] = path
             break
-    
+    #TODO 辞書にすることでエラー項目も保存したい
     error_cities = []
 
-    for city in tqdm(cities):
+    for city_name, city in tqdm(cities):
         #地区選択
         #TODO　都道府県を選択した場合continue
         driver.find_elements_by_xpath(city)[0].click()
-        city_name = driver.find_element_by_xpath(city_name_path).text
         error_flag = False
         #要素選択画面に変更
         driver.find_elements_by_xpath(element_button)[0].click()
