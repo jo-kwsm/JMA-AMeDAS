@@ -1,4 +1,4 @@
-import os, glob, shutil
+import os, shutil
 import pandas as pd
 import time
 from tqdm import tqdm
@@ -10,7 +10,7 @@ import chromedriver_binary
 
 #設定
 url = "https://www.data.jma.go.jp/gmd/risk/obsdl/index.php"
-save_dir = "./data"
+save_root_dir = "./data"
 dl_dir = os.path.join(os.getcwd(),'dl/')
 dl_data_file = os.path.join(dl_dir,"data.csv")
 year_init = 2020
@@ -29,8 +29,16 @@ year_to_button = '//*[@id="selectPeriod"]/div/div[1]/div[2]/div[3]/select[1]'
 city_name_path = '//*[@id="selectedStationList"]/div/div[1]'
 
 #県名のリスト
-#TODO　県のx_pathを辞書で管理
-prefectures = ['//*[@id="pr44"]']
+#県のx_pathを辞書で管理
+prefectures = {
+    '東京都':'//*[@id="pr44"]',
+    '沖縄県':'//*[@id="prefectureTable"]/tbody/tr[16]/td',
+    '茨城県':'//*[@id="pr40"]',
+    '千葉県':'//*[@id="pr45"]',
+    '埼玉県':'//*[@id="pr43"]',
+    '栃木県':'//*[@id="pr41"]',
+    '福島県':'//*[@id="pr36"]',
+}
 #取得要素のリスト
 #テスト時は項目を絞る
 #TODO　本番環境は全項目のダウンロード
@@ -61,38 +69,41 @@ options.add_experimental_option("prefs",prefs)
 if os.path.exists(dl_dir):
     shutil.rmtree(dl_dir)
 os.mkdir(dl_dir)
-if os.path.exists(save_dir):
-    shutil.rmtree(save_dir)
-os.mkdir(save_dir)
+if os.path.exists(save_root_dir):
+    shutil.rmtree(save_root_dir)
+os.mkdir(save_root_dir)
 
-for prefecture in prefectures:
-    #TODO　県名のディレクトリを作成
+for prefecture, prefecture_path in prefectures.items():
+    #県名のディレクトリを作成
+    save_dir = os.path.join(save_root_dir, prefecture+'/')
+    os.mkdir(save_dir)
     #ブラウザのウィンドウを表すオブジェクト"driver"を作成
     driver = webdriver.Chrome(chrome_options=options)
     driver.get(url)
     #立ち上がりを待つ
     time.sleep(0.5)
     #県の項目に移動
-    driver.find_elements_by_xpath(prefecture)[0].click()
+    driver.find_elements_by_xpath(prefecture_path)[0].click()
     time.sleep(0.5)
     #地区のx_pathを取得
-    cities = {}
+    cities = []
     for to in range(1,1000,2):
         path = '//*[@id="stationMap"]/div['+str(to)+']'
         try:
             driver.find_element_by_xpath(path)
         except:
             for id in range(1,to,2):
-                path = '//*[@id="stationMap"]/div['+str(id)+']'
-                name = driver.find_element_by_xpath(path).text
-                cities[name] = path
+                cities.append('//*[@id="stationMap"]/div['+str(id)+']')
             break
-    #TODO 辞書にすることでエラー項目も保存したい
-    error_cities = []
+    #エラー項目を辞書で保存
+    error_cities = {}
 
-    for city_name, city in tqdm(cities):
+    for city in tqdm(cities):
+        #都道府県を選択した場合continue
+        city_name = driver.find_element_by_xpath(city_name_path).text
+        if city_name[-1] in '都道府県':
+            continue
         #地区選択
-        #TODO　都道府県を選択した場合continue
         driver.find_elements_by_xpath(city)[0].click()
         error_flag = False
         #要素選択画面に変更
@@ -134,15 +145,17 @@ for prefecture in prefectures:
                 try:
                     tmp_data.columns=columns[element]
                 except:
-                    error_cities.append(city_name)
+                    #column数が合わなければ名前を保存して飛ばす
+                    error_cities[city_name]=element
                     error_flag = True
                 data_list.append(tmp_data)
                 #消去
                 os.remove(dl_data_file)
             #各要素を横に結合
             data.append(pd.concat(data_list, axis=1, join='outer'))
-        #縦に結合
+        #dataに不備がなければ保存
         if not error_flag:
+            #縦に結合
             data.reverse()
             city_data = pd.concat(data)
             #不要な行を消去
