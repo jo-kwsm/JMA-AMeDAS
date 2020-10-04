@@ -29,7 +29,7 @@ year_to_button = '//*[@id="selectPeriod"]/div/div[1]/div[2]/div[3]/select[1]'
 city_name_path = '//*[@id="selectedStationList"]/div/div[1]'
 
 #県名のリスト
-#TODO　県を指定するx_pathを取得したい
+#TODO　県のx_pathを辞書で管理
 prefectures = ['//*[@id="pr44"]']
 #取得要素のリスト
 #テスト時は項目を絞る
