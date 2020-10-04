@@ -26,6 +26,7 @@ dl_button = '//*[@id="csvdl"]/img'
 year_init_button = '//*[@id="chpr1y"]'
 year_from_button = '//*[@id="selectPeriod"]/div/div[1]/div[2]/div[2]/select[1]'
 year_to_button = '//*[@id="selectPeriod"]/div/div[1]/div[2]/div[3]/select[1]'
+city_name_path = '//*[@id="selectedStationList"]/div/div[1]'
 
 #県名のリスト
 #TODO　県を指定するx_pathを取得したい
@@ -83,20 +84,23 @@ for prefecture in prefectures:
             for id in range(1,to,2):
                 cities.append('//*[@id="stationMap"]/div['+str(id)+']')
             break
-    cities = ['//*[@id="stationMap"]/div[9]']
     #x_pathから地区名を取得
 
-    #for city in tqdm(cities):
-    for city in cities:
+    for city in tqdm(cities):
         #地区選択
         driver.find_elements_by_xpath(city)[0].click()
+        city_name = driver.find_element_by_xpath(city_name_path).text
+        error_flag = False
         #要素選択画面に変更
         driver.find_elements_by_xpath(element_button)[0].click()
         #時別に変更
         driver.find_elements_by_xpath(hour_button)[0].click()
         data = []
         
-        for i in tqdm(range(year_range)):
+        
+        for i in range(year_range):
+            if error_flag:
+                break
             #期間選択画面に変更
             driver.find_elements_by_xpath(period_button)[0].click()
             if i == 0:
@@ -110,6 +114,8 @@ for prefecture in prefectures:
                 select_to.select_by_value(str(year_init-i-1))
             data_list = []
             for element in elements:
+                if error_flag:
+                    break
                 #要素選択画面に変更
                 driver.find_elements_by_xpath(element_button)[0].click()
                 #要素選択
@@ -123,21 +129,25 @@ for prefecture in prefectures:
                 #読み込み
                 tmp_data = pd.read_csv(dl_data_file, encoding="shift-jis", index_col=0, header=None, skiprows=6)
                 #columnを変更
-                tmp_data.columns=columns[element]
+                try:
+                    tmp_data.columns=columns[element]
+                except:
+                    print(city_name)
+                    error_flag = True
                 data_list.append(tmp_data)
                 #消去
                 os.remove(dl_data_file)
             #各要素を横に結合
             data.append(pd.concat(data_list, axis=1, join='outer'))
-
         #縦に結合
-        data.reverse()
-        city_data = pd.concat(data)
-        #不要な行を消去
-        city_data = city_data.drop_duplicates()
-        city_data = city_data.dropna(subset=columns["気温"])
-        #TODO 地域の名前をつけて保存
-        city_data.to_csv(os.path.join(save_dir,"羽田"+".csv"))
+        if not error_flag:
+            data.reverse()
+            city_data = pd.concat(data)
+            #不要な行を消去
+            city_data = city_data.drop_duplicates()
+            city_data = city_data.dropna(subset=columns["気温"])
+            #地域の名前をつけて保存
+            city_data.to_csv(os.path.join(save_dir, city_name+".csv"))
         #地区選択画面に遷移
         driver.find_elements_by_xpath(area_button)[0].click()
         #地区選択解除
