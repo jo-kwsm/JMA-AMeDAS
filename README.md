@@ -1,5 +1,9 @@
 # JMA-AMeDAS
-## 使用環境
+## What
+<a href="http://www.data.jma.go.jp/gmd/risk/obsdl/index.php">気象庁</a>よりAMeDASデータを取得
+
+
+## Environment
 pandas
 
 selenium
