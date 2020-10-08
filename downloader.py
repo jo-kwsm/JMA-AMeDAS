@@ -14,9 +14,9 @@ save_root_dir = "./data"
 dl_dir = os.path.join(os.getcwd(),'dl/')
 dl_data_file = os.path.join(dl_dir,"data.csv")
 year_init = 2020
-year_range = 2
+year_range = 1
 wait_dl = 3
-wait_change = 0.5
+wait_change = 1
 
 #各ボタンのxpath
 area_button = '//*[@id="stationButton"]'
@@ -60,13 +60,112 @@ prefs = {
     'download.directory_upgrade' : True,
 }
 
+def get_data_prefecture(driver, prefecture, prefecture_path, options):
+    print(prefecture)
+    #県名のディレクトリを作成
+    save_dir = os.path.join(save_root_dir, prefecture+'/')
+    os.mkdir(save_dir)
+    #県の項目に移動
+    driver.find_elements_by_xpath(prefecture_path)[0].click()
+    time.sleep(wait_change)
+    #地区のx_pathを取得
+    cities = []
+    already = set()
+    for to in range(1,1000):
+        path = '//*[@id="stationMap"]/div['+str(to)+']'
+        try:
+            driver.find_element_by_xpath(path)
+        except:
+            for id in range(1,to):
+                cities.append('//*[@id="stationMap"]/div['+str(id)+']/div')
+            break
+    #エラー項目を辞書で保存
+    error_cities = {}
+
+    for city in tqdm(cities):
+        #都道府県を選択した場合continue
+        city_name = driver.find_element_by_xpath(city).get_attribute("title")
+        if city_name[-1] in '都道府県':
+            continue
+        if city_name in already:
+            continue
+        already.add(city_name)
+        #地区選択
+        driver.find_elements_by_xpath(city)[0].click()
+        city_name = driver.find_element_by_xpath(city_name_path).text
+        error_flag = False
+        #要素選択画面に変更
+        driver.find_elements_by_xpath(element_button)[0].click()
+        #時別に変更
+        driver.find_elements_by_xpath(hour_button)[0].click()
+        data = []
+        for i in range(year_range):
+            if error_flag:
+                break
+            #期間選択画面に変更
+            driver.find_elements_by_xpath(period_button)[0].click()
+            if i == 0:
+                driver.find_elements_by_xpath(year_init_button)[0].click()
+            else:
+                #期間を指定
+                select_from = Select(driver.find_elements_by_xpath(year_from_button)[0])
+                select_to = Select(driver.find_elements_by_xpath(year_to_button)[0])
+                select_from.select_by_value(str(year_init-i))
+                select_to.select_by_value(str(year_init-i-1))
+            data_list = []
+            for element in elements:
+                if error_flag:
+                    break
+                #要素選択画面に変更
+                driver.find_elements_by_xpath(element_button)[0].click()
+                #要素選択
+                element_path = '//*[@id="'+element+'"]'
+                driver.find_elements_by_xpath(element_path)[0].click()
+                try:
+                    #ダウンロード
+                    driver.find_elements_by_xpath(dl_button)[0].click()
+                    time.sleep(wait_dl)
+                    #読み込み
+                    tmp_data = pd.read_csv(dl_data_file, encoding="shift-jis", index_col=0, header=None, skiprows=6)
+                    #消去
+                    os.remove(dl_data_file)
+                    #columnを変更
+                    tmp_data.columns=columns[element]
+                    data_list.append(tmp_data)
+                except:
+                    #column数が合わないなど問題が起きれば名前を保存して飛ばす
+                    error_cities[city_name]=element
+                    error_flag = True
+                #要素選択解除
+                driver.find_elements_by_xpath(element_path)[0].click()
+            #各要素を横に結合
+            data.append(pd.concat(data_list, axis=1, join='outer'))
+        #dataに不備がなければ保存
+        if not error_flag:
+            #縦に結合
+            data.reverse()
+            city_data = pd.concat(data)
+            #不要な行を消去
+            city_data = city_data.drop_duplicates()
+            city_data = city_data.dropna(subset=columns["気温"])
+            #地域の名前をつけて保存
+            city_data.to_csv(os.path.join(save_dir, city_name+".csv"))
+
+        #地区選択画面に遷移
+        driver.find_elements_by_xpath(area_button)[0].click()
+        #地区選択解除
+        driver.find_elements_by_xpath(city)[0].click()
+    #保存できなかった地域を出力
+    for k,v in error_cities.items():
+        print(":".join([k,v]))
+    #ドライバーを閉じる
+    driver.quit()
+
 def main():
     #ブラウザ閲覧時のオプションを指定するオブジェクト"options"を作成
     options= Options()
     #必要に応じてオプションを追加
     options.add_experimental_option("prefs",prefs)
-
-    #TODO クラスでドライバーを管理
 
     #save,dlディレクトリを確認
     if os.path.exists(dl_dir):
@@ -77,106 +176,24 @@ def main():
     os.mkdir(save_root_dir)
 
     for prefecture, prefecture_path in prefectures.items():
-        print(prefecture)
-        #県名のディレクトリを作成
-        save_dir = os.path.join(save_root_dir, prefecture+'/')
-        os.mkdir(save_dir)
-        #ブラウザのウィンドウを表すオブジェクト"driver"を作成
-        driver = webdriver.Chrome(chrome_options=options)
-        driver.get(url)
-        #立ち上がりを待つ
-        time.sleep(wait_change)
-        #県の項目に移動
-        driver.find_elements_by_xpath(prefecture_path)[0].click()
-        time.sleep(wait_change)
-        #地区のx_pathを取得
-        cities = []
-        for to in range(1000):
-            path = '//*[@id="stationMap"]/div['+str(to)+']'
+        flag = True
+        cnt=1
+        while flag:
+            #ブラウザのウィンドウを表すオブジェクト"driver"を作成
+            driver = webdriver.Chrome(chrome_options=options)
+            driver.get(url)
+            #立ち上がりを待つ
+            time.sleep(wait_change)
             try:
-                driver.find_element_by_xpath(path)
+                get_data_prefecture(driver, prefecture, prefecture_path, options)
+                flag = False
             except:
-                for id in range(to):
-                    cities.append('//*[@id="stationMap"]/div['+str(id)+']/div')
-                break
-        #エラー項目を辞書で保存
-        error_cities = {}
+                print("retry:"+str(cnt))
+                cnt+=1
+            driver.quit()
+            if cnt>5:
+                flag = False
 
-        for city in tqdm(cities):
-            #都道府県を選択した場合continue
-            city_name = driver.find_element_by_xpath(city).get_attribute("title")
-            if city_name[-1] in '都道府県':
-                continue
-            #地区選択
-            driver.find_elements_by_xpath(city)[0].click()
-            city_name = driver.find_element_by_xpath(city_name_path).text
-            error_flag = False
-            #要素選択画面に変更
-            driver.find_elements_by_xpath(element_button)[0].click()
-            #時別に変更
-            driver.find_elements_by_xpath(hour_button)[0].click()
-            data = []
-            for i in range(year_range):
-                if error_flag:
-                    break
-                #期間選択画面に変更
-                driver.find_elements_by_xpath(period_button)[0].click()
-                if i == 0:
-                    driver.find_elements_by_xpath(
-                        year_init_button)[0].click()
-                else:
-                    #期間を指定
-                    select_from = Select(driver.find_elements_by_xpath(year_from_button)[0])
-                    select_to = Select(driver.find_elements_by_xpath(year_to_button)[0])
-                    select_from.select_by_value(str(year_init-i))
-                    select_to.select_by_value(str(year_init-i-1))
-                data_list = []
-                for element in elements:
-                    if error_flag:
-                        break
-                    #要素選択画面に変更
-                    driver.find_elements_by_xpath(element_button)[0].click()
-                    #要素選択
-                    element_path = '//*[@id="'+element+'"]'
-                    driver.find_elements_by_xpath(element_path)[0].click()
-                    #ダウンロード
-                    driver.find_elements_by_xpath(dl_button)[0].click()
-                    time.sleep(wait_dl)
-                    #要素選択解除
-                    driver.find_elements_by_xpath(element_path)[0].click()
-                    #読み込み
-                    tmp_data = pd.read_csv(dl_data_file, encoding="shift-jis", index_col=0, header=None, skiprows=6)
-                    #columnを変更
-                    try:
-                        tmp_data.columns=columns[element]
-                    except:
-                        #column数が合わなければ名前を保存して飛ばす
-                        error_cities[city_name]=element
-                        error_flag = True
-                    data_list.append(tmp_data)
-                    #消去
-                    os.remove(dl_data_file)
-                #各要素を横に結合
-                data.append(pd.concat(data_list, axis=1, join='outer'))
-            #dataに不備がなければ保存
-            if not error_flag:
-                #縦に結合
-                data.reverse()
-                city_data = pd.concat(data)
-                #不要な行を消去
-                city_data = city_data.drop_duplicates()
-                city_data = city_data.dropna(subset=columns["気温"])
-                #地域の名前をつけて保存
-                city_data.to_csv(os.path.join(save_dir, city_name+".csv"))
-            #地区選択画面に遷移
-            driver.find_elements_by_xpath(area_button)[0].click()
-            #地区選択解除
-            driver.find_elements_by_xpath(city)[0].click()
-        #保存できなかった地域を出力
-        for k,v in error_cities.items():
-            print(":".join([k,v]))
-        #ドライバーを閉じる
-        driver.quit()
-    
+
 if __name__ == '__main__':
     main()
