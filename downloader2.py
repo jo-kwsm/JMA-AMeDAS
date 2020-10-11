@@ -57,6 +57,8 @@ def get_place_list(pre_no):
   for area in areas:
     name = area.get("alt")
     #TODO 都道府県全地点選択も防ぐ
+    if len(name) >= 3 and name[-3:] == "全地点":
+      continue
     if name[-1] in "都道府県":
       continue
     if name in already:
