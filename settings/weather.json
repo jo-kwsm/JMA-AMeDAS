@@ -3,10 +3,12 @@
   "晴れ":"sunny",
   "曇": "cloudy",
   "薄曇":"light-cloudy",
+  "降水現象":"rainfall",
   "雨":"rain",
   "みぞれ":"sleet",
   "雪":"snow",
   "雷電":"thunder",
   "氷あられ":"ice-pellets",
-  "霧":"fog"
+  "霧":"fog",
+  "霧雨":"drizzle"
 }
