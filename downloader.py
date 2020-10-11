@@ -167,8 +167,6 @@ def main():
   #都市を網羅
   for idx in range(len(places)):
     place_name, pre_no, city_no = places[idx]
-    if place_name != "大島":
-      continue
     place_dic[city_no] = place_name
     save_dir = os.path.join(save_root_dir,str(pre_no))
     print("{}/{}\t{}".format(idx+1, len(places), place_name))
