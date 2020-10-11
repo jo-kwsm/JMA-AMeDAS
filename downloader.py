@@ -36,7 +36,7 @@ def get_wind_direction(str):
   res = str
   #例外データの説明
   #http://www.data.jma.go.jp/obd/stats/data/mdrr/man/remark.html
-  change = {"東":"E", "西":"W", "南":"S", "北":"N", ")":")", "]":"]"}
+  change = {"東":"E", "西":"W", "南":"S", "北":"N", "）":")", "]":"]"}
   if res == "静穏":
     res = "calm"
   else:
