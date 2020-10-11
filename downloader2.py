@@ -98,8 +98,8 @@ def get_rowData(row, year, month, day):
     dir_idx = 4
   elif len(row)==17:
     #官署での処理
-    #TODO 官署で取得する項目の選定
-    data_idx = [3, 4, 8, 9, 10, 12, 13]
+    #官署で取得する項目の設定
+    data_idx = [3, 4, 8, 9, 10, 12, 13, 11, 1, 2, 7, 6, 5, 14, 15, 16]
     dir_idx = 9
   else:
     print(len(row))
@@ -108,11 +108,13 @@ def get_rowData(row, year, month, day):
   #各要素を処理
   for idx in data_idx:
     d = data[idx].string
-    if idx == dir_idx:
-      #風向は別で処理
-      d = get_wind_direction(d)
-    else:
-      d = str2float(d)
+    #天気は処理しない
+    if not idx == 14:
+      if idx == dir_idx:
+        #風向は別で処理
+        d = get_wind_direction(d)
+      else:
+        d = str2float(d)
     rowData.append(d)
 
   return rowData

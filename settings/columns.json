@@ -6,5 +6,14 @@
   "風向":"wind-direction",
   "日照時間(h)":"daylight-hours",
   "降雪(cm)":"snowfall",
-  "積雪(cm)":"snowpack"
+  "積雪(cm)":"snowpack",
+  "全天日射量(MJ/㎡)":"solar-radiation",
+  "現地気圧(hPa)":"pressure-local",
+  "海面気圧(hPa)":"pressure-sea",
+  "湿度(％)":"humidity",
+  "蒸気圧(hPa)":"vapor-pressure",
+  "露天温度(℃)":"open-air-temp",
+  "天気":"weather",
+  "雲量":"cloudiness",
+  "視程(km)":"visibility"
 }
