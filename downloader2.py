@@ -15,7 +15,10 @@ with open(os.path.join(settting_dir,"prefectures.json"), "r") as f:
   prefectures = json.load(f)
 with open(os.path.join(settting_dir,"columns.json"), "r") as f:
   columns = json.load(f)
-abnormity_wind = set()
+with open(os.path.join(settting_dir,"weather.json"), "r") as f:
+  weather_change = json.load(f)
+abnormity_wind = {}
+abnormity_weather = {}
 place_dic = {}
 
 
@@ -28,18 +31,39 @@ def str2float(str):
 
 
 
-# 風向を漢字表記から変更
+# 風向を漢字表記から英語に変更
 def get_wind_direction(str):
-  if str == "静穏":
-    return "calm"
+  res = str
   change = {"東":"E", "西":"W", "南":"S", "北":"N"}
-  try:
-    res = [change[s] for s in str]
-    res = "".join(res)
-  except:
-    #TODO 東西南北以外の処理(x,///)
-    abnormity_wind.add(str)
-    res = None
+  if res == "静穏":
+    res = "calm"
+  else:
+    try:
+      res = [change[s] for s in res]
+      res = "".join(res)
+    except:
+      #TODO 東西南北以外の処理(x,///)
+      if res in abnormity_wind.keys():
+        abnormity_wind[res] += 1
+      else:
+        abnormity_wind[res] = 1
+      res = None
+
+  return res
+
+
+
+# 天気を漢字表記から英語に変更
+def get_weather(str):
+  res = str
+  if res in weather_change.keys():
+    res = weather_change[res]
+  else:
+    if res in abnormity_weather.keys():
+      abnormity_weather[res] += 1
+    else:
+      abnormity_weather[res] = 1
+
   return res
 
 
@@ -102,19 +126,23 @@ def get_rowData(row, year, month, day):
     data_idx = [3, 4, 8, 9, 10, 12, 13, 11, 1, 2, 7, 6, 5, 14, 15, 16]
     dir_idx = 9
   else:
-    print(len(row))
+    print("error:データが想定していない要素数",len(row))
     return
   
   #各要素を処理
   for idx in data_idx:
     d = data[idx].string
-    #天気は処理しない
-    if not idx == 14:
-      if idx == dir_idx:
-        #風向は別で処理
-        d = get_wind_direction(d)
-      else:
-        d = str2float(d)
+    
+    if idx == 14:
+      #天気は画像情報なので処理
+      if len(data[idx]) != 0:
+        d = data[idx].find("img").get("alt")
+        d = get_weather(d)
+    elif idx == dir_idx:
+      #風向は別で処理
+      d = get_wind_direction(d)
+    else:
+      d = str2float(d)
     rowData.append(d)
 
   return rowData
@@ -185,7 +213,8 @@ def main():
   json_str = json_str.encode("utf-8")
   with open(os.path.join(save_root_dir,"place_dic.txt"), "wb") as f:
     f.write(json_str)
-  print(abnormity_wind)
+  print("例外的な風向:", abnormity_wind)
+  print("例外的な天気:", abnormity_weather)
 
 
 

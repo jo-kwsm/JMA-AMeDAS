@@ -1,0 +1,11 @@
+{
+  "快晴":"clear",
+  "晴れ":"sunny",
+  "曇": "cloudy",
+  "薄曇":"light-cloudy",
+  "雨":"rain",
+  "みぞれ":"sleet",
+  "雪":"snow",
+  "雷電":"thunder",
+  "氷あられ":"ice-pellets"
+}
