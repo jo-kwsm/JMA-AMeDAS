@@ -34,9 +34,14 @@ def str2float(str):
 # 風向を漢字表記から英語に変更
 def get_wind_direction(str):
   res = str
+  exception = set(["]",")"])
+  tail = None
+  if res[-1] in exception:
+    tail = res[-2:]
+    res = res[:-2]   
   #例外データの説明
   #http://www.data.jma.go.jp/obd/stats/data/mdrr/man/remark.html
-  change = {"東":"E", "西":"W", "南":"S", "北":"N", "）":")", "]":"]"}
+  change = {"東":"E", "西":"W", "南":"S", "北":"N"}
   if res == "静穏":
     res = "calm"
   else:
@@ -50,6 +55,8 @@ def get_wind_direction(str):
       else:
         abnormity_wind[res] = 1
       res = None
+
+  res = res + tail
 
   return res
 
@@ -169,7 +176,7 @@ def main():
   #都市を網羅
   for idx in range(len(places)):
     place_name, pre_no, city_no = places[idx]
-    place_dic[city_no] = place_name
+    place_dic[place_name] = city_no
     save_dir = os.path.join(save_root_dir,str(pre_no))
     print("{}/{}\t{}".format(idx+1, len(places), place_name))
 
