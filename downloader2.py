@@ -13,6 +13,8 @@ base_url = "http://www.data.jma.go.jp/obd/stats/etrn/view/hourly_%s1.php?prec_no
 #jsonから設定を読み込む
 with open(os.path.join(settting_dir,"prefectures.json"), "r") as f:
   prefectures = json.load(f)
+with open(os.path.join(settting_dir,"columns.json"), "r") as f:
+  columns = json.load(f)
 abnormity_wind = set()
 place_dic = {}
 
@@ -125,8 +127,7 @@ def main():
 
   #県名から都市リストをスクレイピング
   places = []
-  for pre_name, pre_no in prefectures.items():
-    place_dic[pre_no] = pre_name
+  for pre_no in prefectures.values():
     save_dir = os.path.join(save_root_dir,str(pre_no))
     os.mkdir(save_dir)
     places = places + get_place_list(pre_no)
@@ -141,7 +142,7 @@ def main():
     #カラムで初期化
     #TODO 官署の場合のカラム
     #TODO 英語名への変更
-    All_list = [['年月日', '降水量(mm)', '気温(℃)', '風速(m/s)', '風向', '日照時間(h)', '降雪(cm)','積雪(cm)']]
+    All_list = [[column for column in columns.values()]]
 
     #日付のリストを作成
     days = [(year,month,day) for year in range(from_year,to_year+1) for month in range(1,13) for day in range(1,32)]

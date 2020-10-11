@@ -1,0 +1,10 @@
+{
+  "年月日":"datetime",
+  "降水量(mm)":"precipitation",
+  "気温(℃)":"temperature",
+  "風速(m/s)":"wind-speed",
+  "風向":"wind-direction",
+  "日照時間(h)":"daylight-hours",
+  "降雪(cm)":"snowfall",
+  "積雪(cm)":"snowpack"
+}
