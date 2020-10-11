@@ -4,21 +4,15 @@ import csv
 import os, shutil, time, json, datetime
 from tqdm import tqdm
 
-prefectures = {
-    '東京都':44,
-    '沖縄県':91,
-    '茨城県':40,
-    '千葉県':45,
-    '埼玉県':43,
-    '栃木県':41,
-    '福島県':36,
-}
-
 from_year = 2018
 to_year = 2020
 save_root_dir = "./data"
+settting_dir = "./settings"
 base_url = "http://www.data.jma.go.jp/obd/stats/etrn/view/hourly_%s1.php?prec_no=%s&block_no=%s&year=%s&month=%s&day=%s&view=p1"
 
+#jsonから設定を読み込む
+with open(os.path.join(settting_dir,"prefectures.json"), "r") as f:
+  prefectures = json.load(f)
 abnormity_wind = set()
 place_dic = {}
 
@@ -171,6 +165,7 @@ def main():
           url = base_url%("s", pre_no, city_no, year, month,day)
           rows = get_rows(url)
         except:
+          print("error:",year,month,day)
           continue
       # 1行ずつデータを処理
       for row in rows:
