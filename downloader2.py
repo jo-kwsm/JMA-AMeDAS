@@ -1,7 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 import csv
-import os, shutil, time
+import os, shutil, time, json
 from tqdm import tqdm
 
 prefectures = {
@@ -19,6 +19,7 @@ save_root_dir = "./data"
 base_url = "http://www.data.jma.go.jp/obd/stats/etrn/view/hourly_%s1.php?prec_no=%s&block_no=%s&year=%s&month=%s&day=%s&view=p1"
 
 abnormity_wind = set()
+place_dic = {}
 
 
 
@@ -55,6 +56,7 @@ def get_place_list(pre_no):
   places = []
   for area in areas:
     name = area.get("alt")
+    #TODO 都道府県全地点選択も防ぐ
     if name[-1] in "都道府県":
       continue
     if name in already:
@@ -144,12 +146,16 @@ def main():
   os.mkdir(save_root_dir)
   #県名から都市リストをスクレイピング
   places = []
-  for pre_no in prefectures.values():
+  for pre_name, pre_no in prefectures.items():
+    place_dic[pre_no] = pre_name
+    save_dir = os.path.join(save_root_dir,str(pre_no))
+    os.mkdir(save_dir)
     places = places + get_place_list(pre_no)
   #都市を網羅
   for idx in range(len(places)):
-    #TODO 都道府県の扱い
-    place_name = places[idx][0]
+    place_name, pre_no, city_no = places[idx]
+    place_dic[city_no] = place_name
+    save_dir = os.path.join(save_root_dir,str(pre_no))
     print("{}/{}\t{}".format(idx+1, len(places), place_name))
     #カラムで初期化
     #TODO 官署の場合のカラム
@@ -160,17 +166,21 @@ def main():
     days = [(year,month,day) for year in range(init_year,2020) for month in range(1,13) for day in range(1,32)]
     for year, month, day in tqdm(days):
       #存在しない日付にアクセスした場合は空のリストを返す
-      rows = get_rows(places[idx][1], places[idx][2], year, month, day)
+      rows = get_rows(pre_no, city_no, year, month, day)
       # 1行ずつデータを処理
       for row in rows:
         #次の行にデータを追加
         All_list.append(get_rowData(row, year, month, day))
 
-    #TODO 保存時の名前をアルファベットに
-    #都市ごとにデータをファイルを新しく生成して書き出す。(csvファイル形式。名前は都市名)
-    with open(os.path.join(save_root_dir,place_name + '.csv'), 'w') as file:
+    #保存時の名前はidで管理
+    #jsonで参照可能
+    with open(os.path.join(save_dir,str(city_no) + '.csv'), 'w') as file:
       writer = csv.writer(file, lineterminator='\n')
       writer.writerows(All_list)
+  json_str = json.dumps(place_dic)
+  json_str = json_str.encode("utf-8")
+  with open(os.path.join(save_root_dir,"place_dic.txt"), "wb") as f:
+    f.write(json_str)
   print(abnormity_wind)
 
 
