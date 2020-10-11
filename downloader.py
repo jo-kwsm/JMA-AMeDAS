@@ -1,199 +1,222 @@
-import os, shutil
-import pandas as pd
-import time
+import requests
+from bs4 import BeautifulSoup
+import csv
+import os, shutil, time, json, datetime
 from tqdm import tqdm
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.ui import Select
-import chromedriver_binary
 
-#設定
-url = "https://www.data.jma.go.jp/gmd/risk/obsdl/index.php"
+from_year = 2018
+to_year = 2020
 save_root_dir = "./data"
-dl_dir = os.path.join(os.getcwd(),'dl/')
-dl_data_file = os.path.join(dl_dir,"data.csv")
-year_init = 2020
-year_range = 1
-wait_dl = 3
-wait_change = 1
+settting_dir = "./settings"
+base_url = "http://www.data.jma.go.jp/obd/stats/etrn/view/hourly_%s1.php?prec_no=%s&block_no=%s&year=%s&month=%s&day=%s&view=p1"
 
-#各ボタンのxpath
-area_button = '//*[@id="stationButton"]'
-element_button = '//*[@id="elementButton"]'
-hour_button = '//*[@id="aggrgPeriod"]/div/div[1]/div[1]/label/input'
-period_button = '//*[@id="periodButton"]'
-dl_button = '//*[@id="csvdl"]/img'
-year_init_button = '//*[@id="chpr1y"]'
-year_from_button = '//*[@id="selectPeriod"]/div/div[1]/div[2]/div[2]/select[1]'
-year_to_button = '//*[@id="selectPeriod"]/div/div[1]/div[2]/div[3]/select[1]'
-city_name_path = '//*[@id="selectedStationList"]/div/div[1]'
+#jsonから設定を読み込む
+with open(os.path.join(settting_dir,"prefectures.json"), "r") as f:
+  prefectures = json.load(f)
+with open(os.path.join(settting_dir,"columns.json"), "r") as f:
+  columns = json.load(f)
+with open(os.path.join(settting_dir,"weather.json"), "r") as f:
+  weather_change = json.load(f)
+abnormity_wind = {}
+abnormity_weather = {}
+place_dic = {}
 
-#県名のリスト
-#県のx_pathを辞書で管理
-prefectures = {
-    '東京都':'//*[@id="pr44"]',
-    '沖縄県':'//*[@id="prefectureTable"]/tbody/tr[16]/td',
-    '茨城県':'//*[@id="pr40"]',
-    '千葉県':'//*[@id="pr45"]',
-    '埼玉県':'//*[@id="pr43"]',
-    '栃木県':'//*[@id="pr41"]',
-    '福島県':'//*[@id="pr36"]',
-}
-#取得要素のリスト
-#テスト時は項目を絞る
-#TODO　本番環境は全項目のダウンロード
-#TODO　カラム名の指定の仕方
-elements = ["気温", "降水量", "日照時間", "風向・風速"]
-columns = {
-    "気温":["temperature","temperature:quality","temperature:homogeneity"],
-    "降水量":["precipitation","precipitation:quality","precipitation:homogeneity"],
-    "日照時間":["daylight","daylight:quality","daylight:homogeneity"],
-    "風向・風速":["wind_velocity","wind_velocity:quality","wind_direction","wind_direction:quality","wind:homogeneity"],
-}
-#elements = ["気温", "降水量","降雪の深さ","積雪の深さ","日照時間","風向・風速","全天日射量","現地気圧","海面気圧","相対湿度","蒸気圧","露点温度","天気","雲量","視程"]
 
-#TODO 本番環境はブラウザを開かない
-prefs = {
-    'download.default_directory' : dl_dir,
-    'download.prompt_for_download' : False,
-    'download.directory_upgrade' : True,
-}
 
-def get_data_prefecture(driver, prefecture, prefecture_path, options):
-    print(prefecture)
-    #県名のディレクトリを作成
-    save_dir = os.path.join(save_root_dir, prefecture+'/')
-    os.mkdir(save_dir)
-    #県の項目に移動
-    driver.find_elements_by_xpath(prefecture_path)[0].click()
-    time.sleep(wait_change)
-    #地区のx_pathを取得
-    cities = []
-    already = set()
-    for to in range(1,1000):
-        path = '//*[@id="stationMap"]/div['+str(to)+']'
-        try:
-            driver.find_element_by_xpath(path)
-        except:
-            for id in range(1,to):
-                cities.append('//*[@id="stationMap"]/div['+str(id)+']/div')
-            break
-    #エラー項目を辞書で保存
-    error_cities = {}
+def str2float(str):
+  try:
+    return float(str)
+  except:
+    return None
 
-    for city in tqdm(cities):
-        #都道府県を選択した場合continue
-        city_name = driver.find_element_by_xpath(city).get_attribute("title")
-        if city_name[-1] in '都道府県':
-            continue
-        if city_name in already:
-            continue
-        already.add(city_name)
-        #地区選択
-        driver.find_elements_by_xpath(city)[0].click()
-        city_name = driver.find_element_by_xpath(city_name_path).text
-        error_flag = False
-        #要素選択画面に変更
-        driver.find_elements_by_xpath(element_button)[0].click()
-        #時別に変更
-        driver.find_elements_by_xpath(hour_button)[0].click()
-        data = []
-        for i in range(year_range):
-            if error_flag:
-                break
-            #期間選択画面に変更
-            driver.find_elements_by_xpath(period_button)[0].click()
-            if i == 0:
-                driver.find_elements_by_xpath(year_init_button)[0].click()
-            else:
-                #期間を指定
-                select_from = Select(driver.find_elements_by_xpath(year_from_button)[0])
-                select_to = Select(driver.find_elements_by_xpath(year_to_button)[0])
-                select_from.select_by_value(str(year_init-i))
-                select_to.select_by_value(str(year_init-i-1))
-            data_list = []
-            for element in elements:
-                if error_flag:
-                    break
-                #要素選択画面に変更
-                driver.find_elements_by_xpath(element_button)[0].click()
-                #要素選択
-                element_path = '//*[@id="'+element+'"]'
-                driver.find_elements_by_xpath(element_path)[0].click()
-                try:
-                    #ダウンロード
-                    driver.find_elements_by_xpath(dl_button)[0].click()
-                    time.sleep(wait_dl)
-                    #読み込み
-                    tmp_data = pd.read_csv(dl_data_file, encoding="shift-jis", index_col=0, header=None, skiprows=6)
-                    #消去
-                    os.remove(dl_data_file)
-                    #columnを変更
-                    tmp_data.columns=columns[element]
-                    data_list.append(tmp_data)
-                except:
-                    #column数が合わないなど問題が起きれば名前を保存して飛ばす
-                    error_cities[city_name]=element
-                    error_flag = True
-                #要素選択解除
-                driver.find_elements_by_xpath(element_path)[0].click()
-            #各要素を横に結合
-            data.append(pd.concat(data_list, axis=1, join='outer'))
-        #dataに不備がなければ保存
-        if not error_flag:
-            #縦に結合
-            data.reverse()
-            city_data = pd.concat(data)
-            #不要な行を消去
-            city_data = city_data.drop_duplicates()
-            city_data = city_data.dropna(subset=columns["気温"])
-            #地域の名前をつけて保存
-            city_data.to_csv(os.path.join(save_dir, city_name+".csv"))
 
-        #地区選択画面に遷移
-        driver.find_elements_by_xpath(area_button)[0].click()
-        #地区選択解除
-        driver.find_elements_by_xpath(city)[0].click()
-    #保存できなかった地域を出力
-    for k,v in error_cities.items():
-        print(":".join([k,v]))
-    #ドライバーを閉じる
-    driver.quit()
+
+# 風向を漢字表記から英語に変更
+def get_wind_direction(str):
+  res = str
+  change = {"東":"E", "西":"W", "南":"S", "北":"N"}
+  if res == "静穏":
+    res = "calm"
+  else:
+    try:
+      res = [change[s] for s in res]
+      res = "".join(res)
+    except:
+      #TODO 東西南北以外の処理(x,///)
+      if res in abnormity_wind.keys():
+        abnormity_wind[res] += 1
+      else:
+        abnormity_wind[res] = 1
+      res = None
+
+  return res
+
+
+
+# 天気を漢字表記から英語に変更
+def get_weather(str):
+  res = str
+  if res in weather_change.keys():
+    res = weather_change[res]
+  else:
+    if res in abnormity_weather.keys():
+      abnormity_weather[res] += 1
+    else:
+      abnormity_weather[res] = 1
+
+  return res
+
+
+
+# 各県の都市を取得
+def get_place_list(pre_no):
+  url = "http://www.data.jma.go.jp/obd/stats/etrn/select/prefecture.php?prec_no=%s&block_no=&year=&month=&day=&view="%(pre_no)
+  r = requests.get(url)
+  r.encoding = r.apparent_encoding
+  soup = BeautifulSoup(r.text,"html.parser")
+  areas = soup.findAll('area')
+  already = set()
+  places = []
+  for area in areas:
+    name = area.get("alt")
+    #TODO 都道府県全地点選択も防ぐ
+    if len(name) >= 3 and name[-3:] == "全地点":
+      continue
+    if name[-1] in "都道府県":
+      continue
+    if name in already:
+      continue
+    already.add(name)
+    city_no = area.get("href").split("block_no=")[1].split("&year")[0]
+    places.append([name, pre_no, city_no])
+
+  return places
+
+
+
+# データページをスクレイピング
+def get_rows(url):
+  # 表をスクレイピング
+  r = requests.get(url)
+  r.encoding = r.apparent_encoding
+  soup = BeautifulSoup(r.text,"html.parser")
+  rows = soup.findAll('tr',class_='mtx')
+  # 表の最初の1~4行目はカラム情報なのでスライス
+  rows = rows[4:]
+  if not (len(rows[0]) == 8 or len(rows[0]) == 17):
+    print(len(rows[0]))
+  return rows
+
+
+
+# 取得した表から必要な情報を取り出す
+def get_rowData(row, year, month, day):
+  data = row.findAll('td')
+  rowData = [] #初期化
+  rowData.append(str(year) + "/" + str(month) + "/" + str(day) + "/" + str(data[0].string))
+
+  #官署かどうかで処理するカラムが変わる
+  if len(row)==8:
+    #官署以外の処理
+    data_idx = [idx for idx in range(1,len(row))]
+    dir_idx = 4
+  elif len(row)==17:
+    #官署での処理
+    #官署で取得する項目の設定
+    data_idx = [3, 4, 8, 9, 10, 12, 13, 11, 1, 2, 7, 6, 5, 14, 15, 16]
+    dir_idx = 9
+  else:
+    print("error:データが想定していない要素数",len(row))
+    return
+  
+  #各要素を処理
+  for idx in data_idx:
+    d = data[idx].string
+    
+    if idx == 14:
+      #天気は画像情報なので処理
+      if len(data[idx]) != 0:
+        d = data[idx].find("img").get("alt")
+        d = get_weather(d)
+    elif idx == dir_idx:
+      #風向は別で処理
+      d = get_wind_direction(d)
+    else:
+      d = str2float(d)
+    rowData.append(d)
+
+  return rowData
+
+
 
 def main():
-    #ブラウザ閲覧時のオプションを指定するオブジェクト"options"を作成
-    options= Options()
-    #必要に応じてオプションを追加
-    options.add_experimental_option("prefs",prefs)
+  #data directoryの初期化
+  if os.path.exists(save_root_dir):
+    shutil.rmtree(save_root_dir)
+  os.mkdir(save_root_dir)
 
-    #save,dlディレクトリを確認
-    if os.path.exists(dl_dir):
-        shutil.rmtree(dl_dir)
-    os.mkdir(dl_dir)
-    if os.path.exists(save_root_dir):
-        shutil.rmtree(save_root_dir)
-    os.mkdir(save_root_dir)
+  #県名から都市リストをスクレイピング
+  places = []
+  for pre_no in prefectures.values():
+    save_dir = os.path.join(save_root_dir,str(pre_no))
+    os.mkdir(save_dir)
+    places = places + get_place_list(pre_no)
+  
+  #都市を網羅
+  for idx in range(len(places)):
+    place_name, pre_no, city_no = places[idx]
+    place_dic[city_no] = place_name
+    save_dir = os.path.join(save_root_dir,str(pre_no))
+    print("{}/{}\t{}".format(idx+1, len(places), place_name))
 
-    for prefecture, prefecture_path in prefectures.items():
-        flag = True
-        cnt=1
-        while flag:
-            #ブラウザのウィンドウを表すオブジェクト"driver"を作成
-            driver = webdriver.Chrome(chrome_options=options)
-            driver.get(url)
-            #立ち上がりを待つ
-            time.sleep(wait_change)
-            try:
-                get_data_prefecture(driver, prefecture, prefecture_path, options)
-                flag = False
-            except:
-                print("retry:"+str(cnt))
-                cnt+=1
-            driver.quit()
-            if cnt>5:
-                flag = False
+    #カラムで初期化
+    #TODO 官署の場合のカラム
+    #TODO 英語名への変更
+    All_list = [[column for column in columns.values()]]
+
+    #日付のリストを作成
+    days = [(year,month,day) for year in range(from_year,to_year+1) for month in range(1,13) for day in range(1,32)]
+
+    #一日ずつデータを取得
+    for year, month, day in tqdm(days):
+      #不正な日付をとばす
+      try:
+        if datetime.date(year,month,day) >= datetime.date.today():
+          continue
+      except:
+        continue
+
+      #官署かどうかでurlが変わる
+      try:
+        url = base_url%("a", pre_no, city_no, year, month,day)
+        rows = get_rows(url)
+      except:
+        #官署のときurlが変わる
+        try:
+          url = base_url%("s", pre_no, city_no, year, month,day)
+          rows = get_rows(url)
+        except:
+          print("error:",year,month,day)
+          continue
+      # 1行ずつデータを処理
+      for row in rows:
+        #次の行にデータを追加
+        All_list.append(get_rowData(row, year, month, day))
+
+    #保存時の名前はidで管理
+    with open(os.path.join(save_dir,str(city_no) + '.csv'), 'w') as file:
+      writer = csv.writer(file, lineterminator='\n')
+      writer.writerows(All_list)
+
+  #設定をjsonで保存
+  json_str = json.dumps(place_dic)
+  json_str = json_str.encode("utf-8")
+  with open(os.path.join(save_root_dir,"place_dic.txt"), "wb") as f:
+    f.write(json_str)
+  print("例外的な風向:", abnormity_wind)
+  print("例外的な天気:", abnormity_weather)
 
 
-if __name__ == '__main__':
-    main()
+
+if __name__ == "__main__":
+  main()
