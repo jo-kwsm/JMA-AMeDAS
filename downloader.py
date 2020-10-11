@@ -79,7 +79,6 @@ def get_place_list(pre_no):
   places = []
   for area in areas:
     name = area.get("alt")
-    #TODO 都道府県全地点選択も防ぐ
     if len(name) >= 3 and name[-3:] == "全地点":
       continue
     if name[-1] in "都道府県":
@@ -170,8 +169,6 @@ def main():
     print("{}/{}\t{}".format(idx+1, len(places), place_name))
 
     #カラムで初期化
-    #TODO 官署の場合のカラム
-    #TODO 英語名への変更
     All_list = [[column for column in columns.values()]]
 
     #日付のリストを作成
