@@ -135,8 +135,11 @@ def get_rowData(row, year, month, day):
     if idx == 14:
       #天気は画像情報なので処理
       if len(data[idx]) != 0:
-        d = data[idx].find("img").get("alt")
-        d = get_weather(d)
+        try:
+          d = data[idx].find("img").get("alt")
+          d = get_weather(d)
+        except:
+          d = None
     elif idx == dir_idx:
       #風向は別で処理
       d = get_wind_direction(d)
@@ -164,6 +167,8 @@ def main():
   #都市を網羅
   for idx in range(len(places)):
     place_name, pre_no, city_no = places[idx]
+    if place_name != "大島":
+      continue
     place_dic[city_no] = place_name
     save_dir = os.path.join(save_root_dir,str(pre_no))
     print("{}/{}\t{}".format(idx+1, len(places), place_name))
