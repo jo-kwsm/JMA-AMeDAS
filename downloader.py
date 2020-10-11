@@ -4,7 +4,7 @@ import csv
 import os, shutil, time, json, datetime
 from tqdm import tqdm
 
-from_year = 2018
+from_year = 2017
 to_year = 2020
 save_root_dir = "./data"
 settting_dir = "./settings"
