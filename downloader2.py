@@ -1,7 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 import csv
-import os, shutil, time, json
+import os, shutil, time, json, datetime
 from tqdm import tqdm
 
 prefectures = {
@@ -14,7 +14,8 @@ prefectures = {
     '福島県':36,
 }
 
-init_year = 2017
+from_year = 2018
+to_year = 2020
 save_root_dir = "./data"
 base_url = "http://www.data.jma.go.jp/obd/stats/etrn/view/hourly_%s1.php?prec_no=%s&block_no=%s&year=%s&month=%s&day=%s&view=p1"
 
@@ -77,34 +78,23 @@ def get_rows(pre_no, city_no, year, month, day):
     #2つの都市コードと年と月を当てはめる
     url = base_url%("a", pre_no, city_no, year, month,day)
     r = requests.get(url)
-    r.encoding = r.apparent_encoding
-
-    # 対象である表をスクレイピング
-    soup = BeautifulSoup(r.text,"html.parser")
-    #表示されている日付を取り出す
-    day_pre = int(soup.findAll('h3')[0].text.split("月")[1].split("日")[0])
   except:
     #官署のときurlが変わる
     #2つの都市コードと年と月を当てはめる
-    url = base_url%("s", pre_no, city_no, year, month,day)
-    r = requests.get(url)
-    r.encoding = r.apparent_encoding
-
-    # 対象である表をスクレイピング
-    soup = BeautifulSoup(r.text,"html.parser")
-    #表示されている日付を取り出す
-    day_pre = int(soup.findAll('h3')[0].text.split("月")[1].split("日")[0])
-
+    try:
+      url = base_url%("s", pre_no, city_no, year, month,day)
+      r = requests.get(url)
+    except:
+      return []
   
-  #意図した日付にアクセスできていなければ飛ばす
-  if day_pre != day:
-    rows = []
-  else:
-    rows = soup.findAll('tr',class_='mtx') #タグ指定してclass名を指定
-    # 表の最初の1~4行目はカラム情報なのでスライス
-    rows = rows[4:]
-    if not (len(rows[0]) == 8 or len(rows[0]) == 17):
-      print(len(rows[0]))
+  # 対象である表をスクレイピング
+  r.encoding = r.apparent_encoding
+  soup = BeautifulSoup(r.text,"html.parser")
+  rows = soup.findAll('tr',class_='mtx') #タグ指定してclass名を指定
+  # 表の最初の1~4行目はカラム情報なのでスライス
+  rows = rows[4:]
+  if not (len(rows[0]) == 8 or len(rows[0]) == 17):
+    print(len(rows[0]))
   return rows
 
 
@@ -164,10 +154,14 @@ def main():
     #TODO 英語名への変更
     All_list = [['年月日', '降水量(mm)', '気温(℃)', '風速(m/s)', '風向', '日照時間(h)', '降雪(cm)','積雪(cm)']]
     #日付のリストを作成
-    #TODO 最新の日付までの対応
-    days = [(year,month,day) for year in range(init_year,2020) for month in range(1,13) for day in range(1,32)]
+    days = [(year,month,day) for year in range(from_year,to_year+1) for month in range(1,13) for day in range(1,32)]
     for year, month, day in tqdm(days):
-      #存在しない日付にアクセスした場合は空のリストを返す
+      #不正な日付をとばす
+      try:
+        if datetime.date(year,month,day) >= datetime.date.today():
+          continue
+      except:
+        continue
       rows = get_rows(pre_no, city_no, year, month, day)
       # 1行ずつデータを処理
       for row in rows:
