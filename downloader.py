@@ -81,6 +81,7 @@ def get_weather(str):
 def get_place_list(pre_no):
   url = "http://www.data.jma.go.jp/obd/stats/etrn/select/prefecture.php?prec_no=%s&block_no=&year=&month=&day=&view="%(pre_no)
   r = requests.get(url)
+  time.sleep(1)
   r.encoding = r.apparent_encoding
   soup = BeautifulSoup(r.text,"html.parser")
   areas = soup.findAll('area')
@@ -106,6 +107,7 @@ def get_place_list(pre_no):
 def get_rows(url):
   # 表をスクレイピング
   r = requests.get(url)
+  time.sleep(1)
   r.encoding = r.apparent_encoding
   soup = BeautifulSoup(r.text,"html.parser")
   rows = soup.findAll('tr',class_='mtx')
