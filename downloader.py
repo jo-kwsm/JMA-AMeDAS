@@ -1,7 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 import csv
-import os, shutil, time, json, datetime
+import os, shutil, time, json, datetime, re, sys
 from tqdm import tqdm
 
 from_year = 2017
@@ -19,7 +19,6 @@ with open(os.path.join(settting_dir,"weather.json"), "r") as f:
   weather_change = json.load(f)
 abnormity_wind = {}
 abnormity_weather = {}
-place_dic = {}
 
 
 
@@ -55,8 +54,8 @@ def get_wind_direction(str):
       else:
         abnormity_wind[res] = 1
       res = None
-
-  res = res + tail
+  if tail != None:
+    res = res + tail
 
   return res
 
@@ -87,17 +86,32 @@ def get_place_list(pre_no):
   areas = soup.findAll('area')
   already = set()
   places = []
+  city_dic = {}
+
+  save_dir = os.path.join(save_root_dir,str(pre_no))
+  if os.path.exists(save_dir):
+    shutil.rmtree(save_dir)
+  os.mkdir(save_dir)
+
   for area in areas:
-    name = area.get("alt")
-    if len(name) >= 3 and name[-3:] == "全地点":
+    city_name = area.get("alt")
+    if len(city_name) >= 3 and city_name[-3:] == "全地点":
       continue
-    if name[-1] in "都道府県":
+    if city_name[-1] in "都道府県":
       continue
-    if name in already:
+    if city_name in already:
       continue
-    already.add(name)
+
+    already.add(city_name)
     city_no = area.get("href").split("block_no=")[1].split("&year")[0]
-    places.append([name, pre_no, city_no])
+    places.append([city_name, pre_no, city_no])
+    city_dic[city_name] = city_no
+
+  #設定をjsonで保存
+  json_str = json.dumps(city_dic)
+  json_str = json_str.encode("utf-8")
+  with open(os.path.join(save_root_dir,"place_dic.json"), "wb") as f:
+    f.write(json_str)
 
   return places
 
@@ -162,23 +176,21 @@ def get_rowData(row, year, month, day):
 
 
 
-def main():
+def main(pre_list):
   #data directoryの初期化
-  if os.path.exists(save_root_dir):
-    shutil.rmtree(save_root_dir)
-  os.mkdir(save_root_dir)
+  if not os.path.exists(save_root_dir):
+    os.mkdir(save_root_dir)
 
   #県名から都市リストをスクレイピング
   places = []
-  for pre_no in prefectures.values():
-    save_dir = os.path.join(save_root_dir,str(pre_no))
-    os.mkdir(save_dir)
+  for pre_name, pre_no in prefectures.items():
+    if not ("all" in pre_list or pre_name in pre_list):
+      continue
     places = places + get_place_list(pre_no)
   
   #都市を網羅
   for idx in range(len(places)):
     place_name, pre_no, city_no = places[idx]
-    place_dic[place_name] = city_no
     save_dir = os.path.join(save_root_dir,str(pre_no))
     print("{}/{}\t{}".format(idx+1, len(places), place_name))
 
@@ -219,15 +231,13 @@ def main():
       writer = csv.writer(file, lineterminator='\n')
       writer.writerows(All_list)
 
-  #設定をjsonで保存
-  json_str = json.dumps(place_dic)
-  json_str = json_str.encode("utf-8")
-  with open(os.path.join(save_root_dir,"place_dic.json"), "wb") as f:
-    f.write(json_str)
   print("例外的な風向:", abnormity_wind)
   print("例外的な天気:", abnormity_weather)
 
 
 
 if __name__ == "__main__":
-  main()
+  pre_list = set(sys.argv)
+  if len(pre_list) == 0:
+    pre_list.add("all")
+  main(pre_list)
