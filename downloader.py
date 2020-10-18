@@ -110,7 +110,7 @@ def get_place_list(pre_no):
   #設定をjsonで保存
   json_str = json.dumps(city_dic)
   json_str = json_str.encode("utf-8")
-  with open(os.path.join(save_root_dir,"place_dic.json"), "wb") as f:
+  with open(os.path.join(save_dir,"place_dic.json"), "wb") as f:
     f.write(json_str)
 
   return places
