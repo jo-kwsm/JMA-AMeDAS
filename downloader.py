@@ -19,6 +19,7 @@ with open(os.path.join(settting_dir,"weather.json"), "r") as f:
   weather_change = json.load(f)
 abnormity_wind = {}
 abnormity_weather = {}
+pre_list = set()
 
 
 
@@ -97,7 +98,7 @@ def get_place_list(pre_no):
     city_name = area.get("alt")
     if len(city_name) >= 3 and city_name[-3:] == "全地点":
       continue
-    if city_name[-1] in "都道府県":
+    if city_name[-1] in pre_list:
       continue
     if city_name in already:
       continue
