@@ -78,7 +78,7 @@ def get_weather(str):
 
 # 各県の都市を取得
 def get_place_list(pre_no):
-  url = "http://www.data.jma.go.jp/obd/stats/etrn/select/prefecture.php?prec_no=%s&block_no=&year=&month=&day=&view="%(pre_no)
+  url = "http://www.data.jma.go.jp/obd/stats/etrn/select/prefecture.php?prec_no=%s&block_no=&year=&month=&day=&view="%pre_no
   r = requests.get(url)
   time.sleep(1)
   r.encoding = r.apparent_encoding
@@ -183,7 +183,8 @@ def main(pre_list):
 
   #県名から都市リストをスクレイピング
   places = []
-  for pre_name, pre_no in prefectures.items():
+  print("---Get place id---")
+  for pre_name, pre_no in tqdm(prefectures.items()):
     if not ("all" in pre_list or pre_name in pre_list):
       continue
     places = places + get_place_list(pre_no)
@@ -238,6 +239,6 @@ def main(pre_list):
 
 if __name__ == "__main__":
   pre_list = set(sys.argv)
-  if len(pre_list) == 0:
+  if len(pre_list) == 1:
     pre_list.add("all")
   main(pre_list)
